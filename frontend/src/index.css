@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg-dark text-slate-100 min-h-screen font-sans;
+  }
+}
+
+@layer components {
+  .gradient-text {
+    @apply bg-gradient-to-br from-accent-primary to-accent-secondary bg-clip-text text-transparent;
+  }
+  
+  .card {
+    @apply bg-bg-card rounded-xl p-6 border border-slate-700 shadow-md transition-all duration-200;
+  }
+  
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md font-medium cursor-pointer transition-all duration-200 border-none disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-primary {
+    @apply bg-gradient-to-br from-accent-primary to-accent-secondary text-white hover:opacity-90;
+  }
+  
+  .btn-secondary {
+    @apply bg-bg-card-hover text-slate-100 hover:bg-slate-600;
+  }
+  
+  .btn-danger {
+    @apply bg-red-500/10 text-red-500 hover:bg-red-500/20;
+  }
+  
+  .btn-success {
+    @apply bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20;
+  }
+
+  .form-control {
+    @apply w-full px-4 py-3 rounded-md border border-slate-700 bg-bg-dark text-slate-100 transition-colors focus:outline-none focus:border-accent-primary;
+  }
+  
+  .input-group {
+    @apply flex flex-col gap-2 mb-6;
+  }
+  
+  .input-group label {
+    @apply text-sm font-medium text-slate-400;
+  }
+
+  .badge {
+    @apply inline-flex px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider;
+  }
+  
+  .badge-primary { @apply bg-indigo-500/10 text-indigo-400; }
+  .badge-success { @apply bg-emerald-500/10 text-emerald-400; }
+  .badge-warning { @apply bg-amber-500/10 text-amber-400; }
+  .badge-danger { @apply bg-red-500/10 text-red-400; }
+}
+
+/* React Toastify Overrides for Dark Mode */
+.Toastify__toast-theme--light {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+}
