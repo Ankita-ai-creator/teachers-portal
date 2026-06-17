@@ -1,35 +1,31 @@
-import axios from 'axios';
+import axiosClient from './axiosClient';
 
-const api = axios.create({
-  baseURL: '/api/grades',
-});
-
-export const submitGrade = async (data) => {
-  const response = await api.post('/', data);
+export const submitGrade = async (dataPayload) => {
+  const response = await axiosClient.post('/grades', dataPayload);
   return response.data;
 };
 
 export const submitBulkGrades = async (gradesArray) => {
-  const response = await api.post('/bulk', { grades: gradesArray });
+  const response = await axiosClient.post('/grades/bulk', { grades: gradesArray });
   return response.data;
 };
 
-export const updateGrade = async (id, data) => {
-  const response = await api.put(`/${id}`, data);
+export const updateGrade = async (id, dataPayload) => {
+  const response = await axiosClient.put(`/grades/${id}`, dataPayload);
   return response.data;
 };
 
 export const getGradesByStudent = async (studentId) => {
-  const response = await api.get(`/student/${studentId}`);
+  const response = await axiosClient.get(`/grades/student/${studentId}`);
   return response.data;
 };
 
 export const getGradesByAssignment = async (assignmentId) => {
-  const response = await api.get(`/assignment/${assignmentId}`);
+  const response = await axiosClient.get(`/grades/assignment/${assignmentId}`);
   return response.data;
 };
 
 export const getGradeAnalytics = async (className) => {
-  const response = await api.get(`/analytics/${className}`);
+  const response = await axiosClient.get(`/grades/analytics/${className}`);
   return response.data;
 };

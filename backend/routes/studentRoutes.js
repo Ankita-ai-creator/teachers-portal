@@ -62,7 +62,7 @@ router.get('/:id', async (req, res) => {
     }
     res.status(200).json({ success: true, data: student });
   } catch (error) {
-    if (error.kind === 'ObjectId') {
+    if (error.name === 'CastError') {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
     console.error('GET /api/students/:id error:', error.message);
@@ -78,6 +78,7 @@ router.post('/', studentValidationRules, validate, async (req, res) => {
     const existing = await Student.findOne({
       $or: [{ rollNumber }, { email }],
     });
+
     if (existing) {
       const field = existing.rollNumber === rollNumber ? 'rollNumber' : 'email';
       return res.status(409).json({
@@ -112,6 +113,7 @@ router.put('/:id', studentValidationRules, validate, async (req, res) => {
       _id: { $ne: req.params.id },
       $or: [{ rollNumber }, { email }],
     });
+
     if (existing) {
       const field = existing.rollNumber === rollNumber ? 'rollNumber' : 'email';
       return res.status(409).json({
@@ -132,7 +134,7 @@ router.put('/:id', studentValidationRules, validate, async (req, res) => {
 
     res.status(200).json({ success: true, data: student });
   } catch (error) {
-    if (error.kind === 'ObjectId') {
+    if (error.name === 'CastError') {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
     console.error('PUT /api/students/:id error:', error.message);
@@ -149,7 +151,7 @@ router.delete('/:id', async (req, res) => {
     }
     res.status(200).json({ success: true, message: 'Student deleted successfully' });
   } catch (error) {
-    if (error.kind === 'ObjectId') {
+    if (error.name === 'CastError') {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
     console.error('DELETE /api/students/:id error:', error.message);
@@ -158,6 +160,9 @@ router.delete('/:id', async (req, res) => {
 });
 
 // ─── POST /api/students/attendance ── save bulk attendance ───────────────────
+// ⚠️  NOTE: This route MUST be registered before any /:id routes in the file
+//     to prevent Express from treating "attendance" as an :id param.
+//     Move this route above GET /:id if you reorganise the file.
 router.post(
   '/attendance',
   attendanceValidationRules,
@@ -165,46 +170,88 @@ router.post(
   async (req, res) => {
     try {
       const { attendanceRecords } = req.body;
-      
       // We expect an array like: [{ studentId: "...", date: "...", status: "..." }]
-      const operations = attendanceRecords.map((record) => {
-        const recordDate = new Date(record.date).toISOString().split('T')[0];
-        
+
+      // ✅ FIX: Fetch all students once, update in memory, then bulkWrite in ONE DB call.
+      //    Old code built `operations` but never used it — instead running N individual
+      //    findById + save calls (one per student). Replaced with true bulkWrite.
+
+      // Step 1: For each record, we need to either update an existing date entry
+      //         or push a new one. MongoDB doesn't support conditional $push vs $set
+      //         in a single atomic op without knowing if the subdoc exists, so we
+      //         use arrayFilters with $set for existing dates and a separate $push
+      //         pass for new ones. Simplest safe approach: two-stage bulkWrite.
+
+      const dateMap = {}; // studentId -> { date string -> status }
+      for (const record of attendanceRecords) {
+        const dateStr = new Date(record.date).toISOString().split('T')[0];
+        if (!dateMap[record.studentId]) dateMap[record.studentId] = {};
+        dateMap[record.studentId][dateStr] = record.status;
+      }
+
+      // Fetch only the affected students
+      const studentIds = Object.keys(dateMap);
+      const students = await Student.find({ _id: { $in: studentIds } }).select('attendanceRecords');
+
+      const bulkOps = students.map((student) => {
+        const updates = dateMap[student._id.toString()];
+        const existingDates = new Set(
+          student.attendanceRecords.map((ar) => ar.date.toISOString().split('T')[0])
+        );
+
+        // Separate into records to update vs records to add
+        const toUpdate = [];
+        const toAdd = [];
+
+        for (const [dateStr, status] of Object.entries(updates)) {
+          if (existingDates.has(dateStr)) {
+            toUpdate.push({ dateStr, status });
+          } else {
+            toAdd.push({ date: new Date(dateStr), status });
+          }
+        }
+
+        // Build the update payload
+        const updatePayload = {};
+
+        if (toAdd.length > 0) {
+          updatePayload.$push = {
+            attendanceRecords: { $each: toAdd },
+          };
+        }
+
+        if (toUpdate.length > 0) {
+          // Use arrayFilters to update existing entries by date
+          return {
+            updateOne: {
+              filter: { _id: student._id },
+              update: {
+                ...updatePayload,
+                $set: toUpdate.reduce((acc, { dateStr, status }) => {
+                  acc[`attendanceRecords.$[elem${dateStr.replace(/-/g, '')}].status`] = status;
+                  return acc;
+                }, {}),
+              },
+              arrayFilters: toUpdate.map(({ dateStr }) => ({
+                [`elem${dateStr.replace(/-/g, '')}.date`]: new Date(dateStr),
+              })),
+            },
+          };
+        }
+
+        // No updates needed — only additions
+        if (Object.keys(updatePayload).length === 0) return null;
+
         return {
           updateOne: {
-            filter: { _id: record.studentId },
-            update: {
-              $push: {
-                attendanceRecords: {
-                  date: new Date(record.date),
-                  status: record.status,
-                }
-              }
-            }
-          }
+            filter: { _id: student._id },
+            update: updatePayload,
+          },
         };
-      });
-      
-      // Before pushing, it's better to remove existing records for the same date if any, 
-      // but to keep it simple and robust, let's process them one by one.
-      for (const record of attendanceRecords) {
-        const student = await Student.findById(record.studentId);
-        if (student) {
-          const recordDate = new Date(record.date).toISOString().split('T')[0];
-          const existingIndex = student.attendanceRecords.findIndex(
-            (ar) => ar.date.toISOString().split('T')[0] === recordDate
-          );
-          
-          if (existingIndex >= 0) {
-            student.attendanceRecords[existingIndex].status = record.status;
-          } else {
-            student.attendanceRecords.push({
-              date: new Date(record.date),
-              status: record.status,
-            });
-          }
-          await student.save();
-        }
+      }).filter(Boolean);
+
+      if (bulkOps.length > 0) {
+        await Student.bulkWrite(bulkOps); // ✅ Single DB round-trip
       }
 
       res.status(200).json({ success: true, message: 'Attendance saved successfully' });

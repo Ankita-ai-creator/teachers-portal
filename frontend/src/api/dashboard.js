@@ -1,10 +1,6 @@
-import axios from 'axios';
-
-const api = axios.create({
-  baseURL: '/api/dashboard',
-});
+import axiosClient from './axiosClient';
 
 export const getDashboardStats = async () => {
-  const { data } = await api.get('/stats');
+  const { data } = await axiosClient.get('/dashboard/stats');
   return data;
 };

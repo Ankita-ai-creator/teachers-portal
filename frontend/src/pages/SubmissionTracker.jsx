@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { FiCheckCircle, FiXCircle } from 'react-icons/fi';
-import { getAssignmentById, submitAssignment, unmarkSubmission } from '../api/assignments';
+import { getAssignmentById, markSubmission, unmarkSubmission } from '../api/assignments';
 import { getStudents } from '../api/students';
 
 const SubmissionTracker = () => {
@@ -36,7 +36,7 @@ const SubmissionTracker = () => {
         await unmarkSubmission(id, studentId);
         toast.info('Marked as pending');
       } else {
-        await submitAssignment(id, studentId);
+        await markSubmission(id, studentId);
         toast.success('Marked as submitted');
       }
       fetchData();

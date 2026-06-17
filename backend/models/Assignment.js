@@ -39,7 +39,8 @@ const assignmentSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Teacher',
-    // Optional for now until Teacher auth is implemented
+    required: false,
+    default: null,
   },
   createdAt: {
     type: Date,

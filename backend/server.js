@@ -19,11 +19,14 @@ app.use(express.json());
 const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+const { protect } = require('./middleware/auth');
+
 // Routes
-app.use('/api/students', require('./routes/studentRoutes'));
-app.use('/api/assignments', require('./routes/assignmentRoutes'));
-app.use('/api/grades', require('./routes/gradeRoutes'));
-app.use('/api/dashboard', require('./routes/dashboardRoutes'));
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/students', protect, require('./routes/studentRoutes'));
+app.use('/api/assignments', protect, require('./routes/assignmentRoutes'));
+app.use('/api/grades', protect, require('./routes/gradeRoutes'));
+app.use('/api/dashboard', protect, require('./routes/dashboardRoutes'));
 
 // Health check
 app.get('/api/health', (req, res) => {
